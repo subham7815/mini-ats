@@ -116,7 +116,8 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     database: {
       status: dbStates[mongoose.connection.readyState] || 'unknown',
-      connected: isDbConnected
+      connected: isDbConnected,
+      lastError: global.lastDbError || null
     }
   });
 });
@@ -137,7 +138,7 @@ app.use(async (req, res, next) => {
     res.status(500).json({
       success: false,
       message: 'Database connection error. Please verify MONGODB_URI in your Vercel Project Settings.',
-      error: process.env.NODE_ENV === 'production' ? undefined : err.message
+      error: err.message
     });
   }
 });

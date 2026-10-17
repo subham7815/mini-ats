@@ -72,9 +72,11 @@ const connectDB = async () => {
 
     try {
       cached.conn = await cached.promise;
+      global.lastDbError = null;
       return cached.conn;
     } catch (error) {
       cached.promise = null;
+      global.lastDbError = error.message;
       console.error(`❌ MongoDB connection error on Vercel: ${error.message}`);
       throw error;
     }
