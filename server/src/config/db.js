@@ -2,9 +2,20 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
 
-dotenv.config({ path: path.join(__dirname, '../../../.env') });
+// Try loading environment variables from possible local paths if not already provided
+if (!process.env.MONGODB_URI) {
+  dotenv.config({ path: path.join(__dirname, '../../../.env') });
+  dotenv.config({ path: path.join(__dirname, '../../.env') });
+  dotenv.config();
+}
 
 let mongoMemoryServer = null;
+
+// Global cached connection for serverless environments (Vercel Functions)
+let cached = global.mongoose;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
 const checkAndSeed = async () => {
   try {
@@ -21,34 +32,97 @@ const checkAndSeed = async () => {
 };
 
 const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ats-app';
+  // If already connected, reuse connection
+  if (cached.conn && mongoose.connection.readyState === 1) {
+    return cached.conn;
+  }
+
+  // If a connection promise is in-flight, await it
+  if (cached.promise) {
+    cached.conn = await cached.promise;
+    return cached.conn;
+  }
+
+  const uri = process.env.MONGODB_URI;
+  const isVercel = Boolean(process.env.VERCEL);
   const forceMemory = process.env.DEMO_MODE === 'true';
 
-  if (!forceMemory) {
-    try {
-      console.log(`📡 Connecting to MongoDB at ${uri}...`);
-      const conn = await mongoose.connect(uri, {
-        serverSelectionTimeoutMS: 2500
+  // 1. If running on Vercel (Production Serverless)
+  if (isVercel) {
+    if (!uri) {
+      const err = new Error(
+        'MONGODB_URI environment variable is not defined on Vercel. Please set MONGODB_URI in your Vercel Project Settings.'
+      );
+      console.error(`❌ ${err.message}`);
+      throw err;
+    }
+
+    console.log('📡 Connecting to MongoDB Atlas (Vercel Serverless)...');
+    cached.promise = mongoose
+      .connect(uri, {
+        bufferCommands: false,
+        serverSelectionTimeoutMS: 5000,
+        maxPoolSize: 10
+      })
+      .then(async (m) => {
+        console.log(`✅ MongoDB connected: ${m.connection.host}`);
+        await checkAndSeed();
+        return m;
       });
-      console.log(`✅ MongoDB connected: ${conn.connection.host}`);
-      await checkAndSeed();
-      return conn;
-    } catch (err) {
-      console.log(`⚠️  No local MongoDB detected (${err.message}).`);
-      console.log('🔄 Launching zero-configuration In-Memory MongoDB engine...');
+
+    try {
+      cached.conn = await cached.promise;
+      return cached.conn;
+    } catch (error) {
+      cached.promise = null;
+      console.error(`❌ MongoDB connection error on Vercel: ${error.message}`);
+      throw error;
     }
   }
 
-  // Fallback to in-memory MongoDB
+  // 2. If running in Local Development / Test
+  const localUri = uri || 'mongodb://localhost:27017/ats-app';
+
+  if (!forceMemory) {
+    try {
+      console.log(`📡 Connecting to MongoDB at ${localUri}...`);
+      cached.promise = mongoose
+        .connect(localUri, {
+          serverSelectionTimeoutMS: 2500
+        })
+        .then(async (m) => {
+          console.log(`✅ MongoDB connected: ${m.connection.host}`);
+          await checkAndSeed();
+          return m;
+        });
+
+      cached.conn = await cached.promise;
+      return cached.conn;
+    } catch (err) {
+      cached.promise = null;
+      console.log(`⚠️  No local MongoDB detected (${err.message}).`);
+      console.log('🔄 Launching zero-configuration In-Memory MongoDB engine for local use...');
+    }
+  }
+
+  // 3. Local fallback to In-Memory MongoDB
   try {
     const { MongoMemoryServer } = require('mongodb-memory-server');
-    mongoMemoryServer = await MongoMemoryServer.create();
+    if (!mongoMemoryServer) {
+      mongoMemoryServer = await MongoMemoryServer.create();
+    }
     const memoryUri = mongoMemoryServer.getUri();
-    const conn = await mongoose.connect(memoryUri);
-    console.log(`✅ In-Memory MongoDB engine running at ${memoryUri}`);
-    await checkAndSeed();
-    return conn;
+
+    cached.promise = mongoose.connect(memoryUri).then(async (m) => {
+      console.log(`✅ In-Memory MongoDB engine running at ${memoryUri}`);
+      await checkAndSeed();
+      return m;
+    });
+
+    cached.conn = await cached.promise;
+    return cached.conn;
   } catch (memErr) {
+    cached.promise = null;
     console.error('❌ Failed to start In-Memory MongoDB:', memErr.message);
     throw memErr;
   }
@@ -61,7 +135,10 @@ const closeDB = async () => {
     }
     if (mongoMemoryServer) {
       await mongoMemoryServer.stop();
+      mongoMemoryServer = null;
     }
+    cached.conn = null;
+    cached.promise = null;
   } catch (e) {
     // Ignore close errors
   }

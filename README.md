@@ -3,6 +3,7 @@
 A modern, full-stack Applicant Tracking System designed for HR and talent acquisition teams to manage job openings, candidate pipelines, recruitment stages, and hiring analytics from a centralized dashboard.
 
 ![Tech Stack](https://img.shields.io/badge/Stack-React%20%7C%20Node.js%20%7C%20Express%20%7C%20MongoDB%20%7C%20TailwindCSS-blue)
+![Deployment](https://img.shields.io/badge/Deploy-Vercel%20Ready-black?logo=vercel)
 ![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen)
 
 ---
@@ -44,7 +45,8 @@ A modern, full-stack Applicant Tracking System designed for HR and talent acquis
 
 - **⚡ Zero-Config Database Architecture**
   - Seamlessly connects to local/cloud MongoDB if available (`MONGODB_URI`).
-  - **Automatic In-Memory MongoDB Fallback**: If no MongoDB server is running on the machine, the system automatically boots an in-memory MongoDB engine (`mongodb-memory-server`) and auto-seeds initial demo data. No database installation or Docker required to run out of the box!
+  - **Automatic In-Memory MongoDB Fallback**: In local development without MongoDB installed, the system boots an embedded in-memory MongoDB engine (`mongodb-memory-server`) and auto-seeds demo data.
+  - **Serverless Production Caching**: On Vercel, connections are cached across lambda invocations (`global.mongoose`) to avoid cold-start connection limits.
 
 ---
 
@@ -53,76 +55,147 @@ A modern, full-stack Applicant Tracking System designed for HR and talent acquis
 - **Frontend**:
   - React 18 (Vite)
   - Tailwind CSS
-  - React Router v6
+  - React Router v6 (SPA routing with Vercel rewrites)
   - Lucide React (Icons)
   - Recharts (Data Visualizations)
   - Vitest + React Testing Library
 
 - **Backend**:
   - Node.js & Express
-  - Mongoose 7
-  - `mongodb-memory-server` (Zero-config in-memory engine fallback)
+  - Mongoose 7 with serverless connection pooling
+  - Vercel Serverless Function entry point (`server/api/index.js`)
   - Supertest & Vitest (Automated API tests)
   - Helmet & CORS security middleware
 
 ---
 
-## 🚀 Quick Start Guide
+## 🌐 Vercel Deployment Instructions
+
+The application is deployed on Vercel as two decoupled projects: **Backend (Serverless API)** and **Frontend (SPA Client)**.
+
+### 1. Backend Deployment (`ats-backend`)
+
+1. In the Vercel dashboard, import the repository `https://github.com/subham7815/mini-ats`.
+2. Configure project settings:
+   - **Project Name**: `mini-ats-backend` (or your preferred name)
+   - **Framework Preset**: `Other`
+   - **Root Directory**: `server`
+   - **Build Command**: Leave default (or empty)
+   - **Output Directory**: Leave default (or empty)
+3. Set the **Environment Variables** in Vercel:
+   | Variable | Description | Example Value |
+   |---|---|---|
+   | `MONGODB_URI` | **Required** MongoDB Atlas connection string | `mongodb+srv://<user>:<pwd>@cluster0.abcde.mongodb.net/ats-app?retryWrites=true&w=majority` |
+   | `CLIENT_URL` | URL of the deployed frontend | `https://mini-ats-one.vercel.app` |
+   | `NODE_ENV` | Environment mode | `production` |
+4. Deploy the project.
+5. Verify the backend deployment:
+   - Root endpoint: `https://<backend-url>.vercel.app/` should return:
+     ```json
+     {
+       "message": "Mini ATS API is running",
+       "status": "OK",
+       "version": "1.0.0"
+     }
+     ```
+   - Health endpoint: `https://<backend-url>.vercel.app/api/health` should return:
+     ```json
+     {
+       "success": true,
+       "status": "OK",
+       "message": "ATS API Server is running",
+       "database": {
+         "status": "connected",
+         "connected": true
+       }
+     }
+     ```
+
+### 2. Frontend Deployment (`ats-frontend`)
+
+1. In the Vercel dashboard, create a second project from the same repository.
+2. Configure project settings:
+   - **Project Name**: `mini-ats-frontend`
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: `client`
+   - **Build Command**: `vite build`
+   - **Output Directory**: `dist`
+3. Set the **Environment Variables** in Vercel:
+   | Variable | Description | Example Value |
+   |---|---|---|
+   | `VITE_API_BASE_URL` | **Required** Backend API base URL | `https://mini-ats-tfil.vercel.app/api` |
+4. Deploy the project.
+5. The frontend will now communicate directly with the live backend at `mini-ats-tfil.vercel.app`.
+
+---
+
+## 🗄️ Database Setup (MongoDB Atlas)
+
+For production deployment on Vercel:
+
+1. Create a free cluster at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+2. Under **Security > Database Access**, create a user with read/write permissions.
+3. Under **Security > Network Access**, add IP `0.0.0.0/0` (allow access from anywhere, required for dynamic serverless IPs).
+4. Click **Connect > Drivers > Node.js** to copy your connection string:
+   ```
+   mongodb+srv://<username>:<password>@cluster0.abcde.mongodb.net/ats-app?retryWrites=true&w=majority
+   ```
+5. Add this string as `MONGODB_URI` in your Vercel Backend project settings.
+6. Upon the first request, the database will automatically initialize and auto-seed initial demo candidates and jobs if the collections are empty.
+
+---
+
+## 🚀 Local Development Guide
 
 ### 1. Prerequisites
 - Node.js (v18 or higher)
 - npm (v9 or higher)
 
 ### 2. Installation
-Install all dependencies (root, backend, and frontend) with a single command:
+Install all dependencies across root, backend, and frontend:
 ```bash
 npm run install:all
 ```
-*(Or run `npm install` in the root, `/server`, and `/client` directories individually).*
 
-### 3. Environment Configuration
-The root `.env` file is pre-configured with default development settings:
-```env
-PORT=5000
-NODE_ENV=development
-MONGODB_URI=mongodb://localhost:27017/ats-app
-JWT_SECRET=ats-jwt-secret-development-key-2026
-CLIENT_URL=http://localhost:5173
-```
-*Note: If no local MongoDB is detected, the server automatically starts an in-memory instance.*
-
-### 4. Running the Application
-Start both the backend server and frontend client concurrently:
+### 3. Running Locally
+Start both backend and frontend concurrently:
 ```bash
 npm run dev
 ```
 
 - **Frontend Client**: [http://localhost:5173](http://localhost:5173)
-- **Backend API**: [http://localhost:5000/api](http://localhost:5000/api)
-- **Health Check**: [http://localhost:5000/api/health](http://localhost:5000/api/health)
+- **Backend API Root**: [http://localhost:5000/](http://localhost:5000/)
+- **Backend Health Check**: [http://localhost:5000/api/health](http://localhost:5000/api/health)
 
 ---
 
 ## 🧪 Testing
 
-Run automated tests for both server and client:
+Run the automated test suites:
 
 ```bash
 # Run backend API integration tests
 npm test
 
-# Run frontend component tests
+# Run frontend component unit tests
 npm run test:client
 ```
 
 ---
 
-## 📡 API Endpoints
+## 📡 API Reference
+
+### Root & Health
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/` | Root API status and documentation endpoints |
+| `GET` | `/api` | API status confirmation |
+| `GET` | `/api/health` | Service and MongoDB connection health check |
 
 ### Jobs
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/jobs` | Get all jobs (optional filters: status, department, search) |
+| `GET` | `/api/jobs` | Get all jobs (filters: status, department, search) |
 | `POST` | `/api/jobs` | Create a new job opening |
 | `GET` | `/api/jobs/:id` | Get job details and associated candidates |
 | `PUT` | `/api/jobs/:id` | Update job opening |
@@ -160,22 +233,27 @@ npm run test:client
 ```
 ats-app/
 ├── package.json               # Root scripts (dev, test, install:all)
-├── .env                       # Environment configuration
+├── .env.example               # Template environment configuration
 ├── README.md                  # Project documentation
 ├── server/                    # Express Backend
+│   ├── vercel.json            # Vercel serverless rewrite rules
+│   ├── api/
+│   │   └── index.js           # Vercel serverless entry point
 │   ├── src/
-│   │   ├── config/            # DB connection & in-memory fallback
+│   │   ├── config/            # Serverless cached DB connection
 │   │   ├── controllers/       # Business logic for jobs, candidates, dashboard
 │   │   ├── models/            # Mongoose schemas (Job, Candidate, Activity)
 │   │   ├── routes/            # Express route definitions
-│   │   ├── scripts/           # Database seed script
+│   │   ├── scripts/           # Database seed script & test verifiers
 │   │   ├── __tests__/         # API integration test suite
-│   │   ├── app.js             # Express app setup & middleware
-│   │   └── server.js          # Server entry point
+│   │   ├── app.js             # Express app, CORS, routes & health endpoints
+│   │   └── server.js          # Standalone server entry point
 │   └── package.json
 └── client/                    # Vite + React Frontend
+    ├── vercel.json            # Vercel SPA routing rewrites
+    ├── .env.example           # Template frontend environment configuration
     ├── src/
-    │   ├── components/        # Reusable UI (Sidebar, Badges, Modals, Search, Toasts)
+    │   ├── components/        # UI (Sidebar, Badges, Modals, Search, Dropdowns)
     │   ├── layouts/           # AppLayout with responsive sidebar & top header
     │   ├── pages/
     │   │   ├── Dashboard/     # Metrics, Charts, Activity feed
@@ -184,7 +262,7 @@ ats-app/
     │   │   ├── Pipeline/      # Interactive Kanban stage board
     │   │   ├── Settings/      # System settings and configuration
     │   │   └── NotFound.jsx   # 404 handler
-    │   ├── services/          # Centralized API fetch client
+    │   ├── services/          # Centralized API fetch client with VITE_API_BASE_URL
     │   ├── App.jsx            # React Router setup
     │   ├── main.jsx           # React DOM root
     │   └── index.css          # Tailwind CSS styling & animations

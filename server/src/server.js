@@ -1,26 +1,30 @@
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Load env from root
+dotenv.config({ path: path.join(__dirname, '../../../.env') });
 dotenv.config({ path: path.join(__dirname, '../../.env') });
+dotenv.config();
 
 const app = require('./app');
 const connectDB = require('./config/db');
 
 const PORT = process.env.PORT || 5000;
 
-const startServer = async () => {
-  await connectDB();
+// When running as a standalone server (local dev or traditional hosting)
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`\n🚀 ATS Server running on port ${PORT}`);
+        console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`   Root: http://localhost:${PORT}/`);
+        console.log(`   Health check: http://localhost:${PORT}/api/health`);
+        console.log(`   API base: http://localhost:${PORT}/api\n`);
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to start server:', err.message);
+    });
+}
 
-  app.listen(PORT, () => {
-    console.log(`\n🚀 ATS Server running on port ${PORT}`);
-    console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`   Health check: http://localhost:${PORT}/api/health`);
-    console.log(`   API base: http://localhost:${PORT}/api\n`);
-  });
-};
-
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+module.exports = app;

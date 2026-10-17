@@ -12,11 +12,28 @@ describe('ATS API Integration Tests', () => {
     await closeDB();
   });
 
-  it('GET /api/health should return 200 and healthy status', async () => {
+  it('GET / should return 200 and root API information', async () => {
+    const res = await request(app).get('/');
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Mini ATS API is running');
+    expect(res.body.status).toBe('OK');
+    expect(res.body.documentation).toBeDefined();
+  });
+
+  it('GET /api should return 200 and root API information', async () => {
+    const res = await request(app).get('/api');
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Mini ATS API is running');
+    expect(res.body.status).toBe('OK');
+  });
+
+  it('GET /api/health should return 200 and healthy status with DB info', async () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(res.body.status).toBe('OK');
     expect(res.body.message).toContain('ATS API Server is running');
+    expect(res.body.database).toBeDefined();
   });
 
   it('GET /api/jobs should return a list of jobs', async () => {
