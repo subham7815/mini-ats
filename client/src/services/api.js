@@ -1,4 +1,6 @@
-const API_BASE = '/api';
+const rawBase = import.meta.env.VITE_API_BASE_URL || '/api';
+const cleanBase = rawBase.replace(/\/+$/, '');
+const API_BASE = cleanBase.endsWith('/api') ? cleanBase : `${cleanBase}/api`;
 
 async function request(url, options = {}) {
   const config = {
@@ -13,7 +15,10 @@ async function request(url, options = {}) {
     config.body = JSON.stringify(config.body);
   }
 
-  const response = await fetch(`${API_BASE}${url}`, config);
+  const normalizedUrl = url.startsWith('/') ? url : `/${url}`;
+  const fullUrl = `${API_BASE}${normalizedUrl}`;
+
+  const response = await fetch(fullUrl, config);
   const data = await response.json();
 
   if (!response.ok) {
