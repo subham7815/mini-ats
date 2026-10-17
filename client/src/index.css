@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Transitions */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Toast animations */
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+.toast-enter {
+  animation: slideIn 0.3s ease-out;
+}
+.toast-exit {
+  animation: slideOut 0.3s ease-in;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* Pipeline card drag */
+.pipeline-card {
+  cursor: grab;
+  user-select: none;
+}
+.pipeline-card:active {
+  cursor: grabbing;
+}
+.pipeline-card.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+}
+
+/* Stage badge colors */
+.stage-applied { background-color: #dbeafe; color: #1e40af; }
+.stage-screening { background-color: #fef3c7; color: #92400e; }
+.stage-interview { background-color: #e0e7ff; color: #3730a3; }
+.stage-offer { background-color: #d1fae5; color: #065f46; }
+.stage-hired { background-color: #dcfce7; color: #166534; }
+.stage-rejected { background-color: #fee2e2; color: #991b1b; }
